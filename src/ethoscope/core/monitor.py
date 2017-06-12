@@ -3,6 +3,7 @@ __author__ = 'quentin'
 from tracking_unit import TrackingUnit
 import logging
 import traceback
+from multiprocessing.dummy import Pool  # Do the tracking in multiple threads (".dummy" uses the multiprocessing interface for multithreading)
 
 
 class Monitor(object):
@@ -40,6 +41,7 @@ class Monitor(object):
         self._last_positions = {}
         self._last_time_stamp = 0
         self._is_running = False
+        self._process_pool = Pool(4) # Use 4 threads to do the tracking, since the RPi3 has 4 cores
 
 
         if rois is None:
@@ -108,19 +110,21 @@ class Monitor(object):
                 self._last_time_stamp = t
                 self._frame_buffer = frame
 
-                for j,track_u in enumerate(self._unit_trackers):
-                    data_rows = track_u.track(t, frame)
+                # Use the thread pool to do the tracking for better parallelism
+                trackerFrame=TrackerFrame(t,frame)
+                trackingResults=self._process_pool.map(trackerFrame.run,self._unit_trackers)
+
+                for data_rows,roi,abs_pos in trackingResults:
                     if len(data_rows) == 0:
-                        self._last_positions[track_u.roi.idx] = []
+                        self._last_positions[roi.idx] = []
                         continue
 
-                    abs_pos = track_u.get_last_positions(absolute=True)
 
                     # if abs_pos is not None:
-                    self._last_positions[track_u.roi.idx] = abs_pos
+                    self._last_positions[roi.idx] = abs_pos
 
                     if not result_writer is None:
-                        result_writer.write(t,track_u.roi, data_rows)
+                        result_writer.write(t,roi, data_rows)
 
                 if result_writer is not None:
                     result_writer.flush(t, frame)
@@ -137,6 +141,20 @@ class Monitor(object):
             self._is_running = False
             logging.info("Monitor closing")
 
-
+class TrackerFrame():
+    """
+    Simple class to contain the "t" and "frame" values and make them
+    available to the "run" function. Required since multiprocessing.Pool
+    can (AFAIK) only take a function and the parameter array, not a list
+    of parameters common to all processes (technically threads in our
+    case since we're using multiprocessing.dummy).
+    """
+    def __init__(self,t,frame):
+        self.t=t
+        self.frame=frame
+    def run(self,track_u):
+        data_rows=track_u.track(self.t,self.frame)
+        abs_pos=track_u.get_last_positions(absolute=True)
+        return (data_rows,track_u.roi,abs_pos)
 
 
