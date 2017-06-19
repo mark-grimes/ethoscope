@@ -59,7 +59,10 @@ class DeviceScanner(Thread):
         self._ip_range = ip_range
         self._use_scapy = _use_scapy
 
-        for ip in self._subnet_ips(local_ip, (6,254)):
+        # N.B. The ip range has been limited to 6-30 here temporarily because the system runs out of
+        # threads for each Device. This means that if your ethoscope happens to have a subnet IP
+        # greater than 30 it will not be found. TODO - come up with a better solution.
+        for ip in self._subnet_ips(local_ip, (6,30)):
             d =  Device(ip, device_refresh_period, results_dir=results_dir)
             d.start()
             self._devices.append(d)
