@@ -247,7 +247,7 @@ if __name__ == '__main__':
                         } )
         zeroconf = Zeroconf()
         zeroconf.register_service(serviceInfo)
-        run(api, host='0.0.0.0', port=port, server='cherrypy',debug=option_dict["debug"])
+        run(api, host='0.0.0.0', port=port, debug=option_dict["debug"])
     except Exception as e:
         logging.error(e)
         zeroconf.unregister_service(serviceInfo)
