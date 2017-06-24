@@ -9,6 +9,8 @@ from ethoscope.web_utils.helpers import get_machine_info, get_version, file_in_d
 from ethoscope.web_utils.record import ControlThreadVideoRecording
 from subprocess import call
 import json
+import socket
+from zeroconf import ServiceInfo, Zeroconf
 
 api = Bottle()
 
@@ -224,11 +226,36 @@ if __name__ == '__main__':
         control.start()
 
     try:
+        # Register the ethoscope using zeroconf so that the node knows about it.
+        # I need an address to register the service, but I don't understand which one (different
+        # interfaces will have different addresses). The python module zeroconf fails if I don't
+        # provide one, and the way it gets supplied doesn't appear to be IPv6 compatible. I'll put
+        # in whatever I get from "gethostbyname" but not trust that in the code on the node side.
+        hostname=socket.gethostname()
+        address=socket.gethostbyname(hostname+".local")
+        serviceInfo = ServiceInfo("_ethoscope._tcp.local.",
+                        hostname+"._ethoscope._tcp.local.",
+                        address=socket.inet_aton(address),
+                        port=port,
+                        properties={
+                            'version': '0.0.1',
+                            'id_page': '/id',
+                            'user_options_page': '/user_options',
+                            'static_page': '/static',
+                            'controls_page': '/controls',
+                            'user_options_page': '/user_options'
+                        } )
+        zeroconf = Zeroconf()
+        zeroconf.register_service(serviceInfo)
         run(api, host='0.0.0.0', port=port, server='cherrypy',debug=option_dict["debug"])
     except Exception as e:
         logging.error(e)
+        zeroconf.unregister_service(serviceInfo)
+        zeroconf.close()
         close(1)
     finally:
+        zeroconf.unregister_service(serviceInfo)
+        zeroconf.close()
         close()
 
 
