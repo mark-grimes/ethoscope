@@ -171,7 +171,11 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
         };
 
         $scope.ethoscope.downloaddb = function(){
-            var downloadLink = angular.element('<a href="/downloaddb/'+device_id+'?ip='+$scope.device.ip+'"></a>');
+            var downloadLink=$("#downloaddbHiddenLink")
+            downloadLink.attr({
+                href: "/downloaddb/"+device_id+"?ip="+$scope.device.ip,
+                target: "_blank"
+                })
             downloadLink[0].click();
         };
 
