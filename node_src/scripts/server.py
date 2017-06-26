@@ -330,7 +330,6 @@ if __name__ == '__main__':
     DEBUG = option_dict["debug"]
     RESULTS_DIR = option_dict["results_dir"]
     max_address = 255 if DEBUG else 5
-    LOCAL_IP = get_local_ip(option_dict["subnet_ip"], max_node_subnet_address=max_address, localhost=option_dict["local"])
 
     try:
         WWW_IP = get_internet_ip()
@@ -342,8 +341,7 @@ if __name__ == '__main__':
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
     device_scanner = None
     try:
-        device_scanner = DeviceScanner(LOCAL_IP, results_dir=RESULTS_DIR)
-        #device_scanner = DeviceScanner( results_dir=RESULTS_DIR)
+        device_scanner = DeviceScanner(results_dir=RESULTS_DIR)
         device_scanner.start()
         run(app, host='0.0.0.0', port=PORT, debug=DEBUG)
 
