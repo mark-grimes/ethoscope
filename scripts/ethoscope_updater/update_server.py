@@ -242,7 +242,7 @@ if __name__ == '__main__':
 
 
     try:
-        run(app, host='0.0.0.0', port=port, debug=debug, server='cherrypy')
+        run(app, host='0.0.0.0', port=port, debug=debug)
 
     except KeyboardInterrupt:
         logging.info("Stopping update server cleanly")
