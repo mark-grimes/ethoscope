@@ -74,6 +74,7 @@ def device(action,id):
                 reload_node_daemon()
             else:
                 reload_device_daemon()
+                reload_node_daemon()
         else:
             raise UnexpectedAction()
 
