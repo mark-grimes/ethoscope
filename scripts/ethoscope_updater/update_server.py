@@ -225,13 +225,14 @@ if __name__ == '__main__':
         bare_repo_updater = updater.BareRepoUpdater(bare_repo)
         is_node = True
         device_id = "Node"
+        LOCAL_IP = get_local_ip(option_dict["router_ip"], is_node=is_node)
 
     else:
         bare_repo_updater = None
         is_node = False
         device_id = get_machine_info(MACHINE_ID_FILE)
+        LOCAL_IP = "127.0.0.1"
 
-    LOCAL_IP = get_local_ip(option_dict["router_ip"], is_node=is_node)
     try:
         WWW_IP = get_internet_ip()
     except Exception as e:
