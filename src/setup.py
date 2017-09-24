@@ -32,7 +32,7 @@ setup(
         ],
     install_requires=[
         "numpy>=1.6.1",
-        "scipy >= 0.15.1",
+        "scipy >= 0.14.0",
         "zeroconf>=0.19.1",
         "SQLAlchemy"
     ],
