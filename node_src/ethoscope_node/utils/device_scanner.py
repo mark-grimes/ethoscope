@@ -82,7 +82,11 @@ class DeviceScanner(object):
         # address to use (src/scripts/device_server.py puts gibberish in this field for
         # this reason).
         # Query the IP address just using the services hostname and zeroconf.
-        ip=socket.gethostbyname(info.get_name()+".local")
+        try:
+            ip=socket.gethostbyname(info.get_name()+".local")
+        except:
+            logging.error("Unable to get the IP address of ethoscope service "+info.get_name()+".local")
+            return
         device = Device(ip, self.device_refresh_period, results_dir=self.results_dir)
         device.zeroconf_name = name
         device.start()
