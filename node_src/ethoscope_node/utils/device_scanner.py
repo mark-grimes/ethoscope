@@ -126,10 +126,17 @@ class DNSDeviceScanner(object):
             # Rebuild the list of devices each time, but copy over the Device object where possible
             try:
                 device = self._devices[ipAddress]
+                # "paint" the instance so that I can stop inactive ones
+                device._activeTag = True
             except KeyError:
                 device = Device(ipAddress, self._device_refresh_period, results_dir=self._results_dir)
                 device.start()
             newDeviceList[ipAddress] = device
+
+        # Stop any Devices that have dropped off
+        for _, device in self._devices.iteritems():
+            if hasattr( device, "_activeTag" ): del device._activeTag
+            else: device.stop() # hasn't been transferred to newDeviceList
         self._devices = newDeviceList
 
         out = {}
