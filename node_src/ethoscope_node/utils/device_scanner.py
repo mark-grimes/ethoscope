@@ -99,6 +99,50 @@ class DeviceScanner(object):
                 self.devices.remove(device)
                 return
 
+class DNSDeviceScanner(object):
+    """
+    Picks up devices by making a DNS query for a given service name. It expects to get a list of IP
+    addresses back in the form of a [dnsrr](https://en.wikipedia.org/wiki/Round-robin_DNS) response.
+    This means that you should have previously set up a DNS server with knowledge of all of the devices.
+    This class is intended for use in things like a Docker swarm where the DNS records are set up for
+    you when a device container is started.
+    """
+    def __init__(self, service_name = "device", device_refresh_period = 5, results_dir="/ethoscope_results"):
+        self._devices = {} # key will be the IP address
+        self._service_name = service_name
+        self._device_refresh_period = device_refresh_period
+        self._results_dir = results_dir
+    def start(self):
+        pass
+    def stop(self):
+        for _, device in self._devices.iteritems():
+            device.stop()
+    def get_all_devices_info(self):
+        # Perform the DNS query for the service
+        results = socket.gethostbyname_ex(self._service_name)
+        # The IP address list is the third entry
+        newDeviceList = {} # key is the IP address
+        for ipAddress in results[2]:
+            # Rebuild the list of devices each time, but copy over the Device object where possible
+            try:
+                device = self._devices[ipAddress]
+            except KeyError:
+                device = Device(ipAddress, self._device_refresh_period, results_dir=self._results_dir)
+                device.start()
+            newDeviceList[ipAddress] = device
+        self._devices = newDeviceList
+
+        out = {}
+        for _, device in self._devices.iteritems():
+            out[device.id()]=device.info()
+        return out
+    def get_device(self, id):
+        for _, device in self._devices.iteritems():
+            if device.id()==id:
+                return device
+        # Not found, so produce an error
+        raise KeyError("No such device: %s" % id)
+
 class ActiveDeviceScanner(Thread):
     """
     The older version of DeviceScanner that actively scans a range of IP addresses on the local

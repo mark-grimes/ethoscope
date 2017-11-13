@@ -4,7 +4,7 @@ import socket
 import logging
 import traceback
 from ethoscope_node.utils.helpers import  get_local_ip, get_internet_ip
-from ethoscope_node.utils.device_scanner import DeviceScanner
+from ethoscope_node.utils.device_scanner import DeviceScanner, DNSDeviceScanner
 from ethoscope_node.utils.mysql_db_writer import MySQLdbCSVWriter
 from ethoscope_node.utils.mysql_db_converter import MySQLdbConverter
 from os import walk
@@ -340,6 +340,7 @@ if __name__ == '__main__':
     parser.add_option("-l", "--local", dest="local", default=False, help="Run on localhost (run a node and device on the same machine, for development)", action="store_true")
     parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",help="Where temporary result files are stored")
     parser.add_option("-r", "--subnet-ip", dest="subnet_ip", default="192.169.123.0", help="the ip of the router in your setup")
+    parser.add_option("--dnsservice", dest="dnsservice", default=None, help="Find devices by performing a DNS query for this service, instead of using Zeroconf")
 
 
 
@@ -361,7 +362,10 @@ if __name__ == '__main__':
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
     device_scanner = None
     try:
-        device_scanner = DeviceScanner(results_dir=RESULTS_DIR)
+        if option_dict["dnsservice"] == None:
+            device_scanner = DeviceScanner(results_dir=RESULTS_DIR)
+        else:
+            device_scanner = DNSDeviceScanner(service_name=option_dict["dnsservice"], results_dir=RESULTS_DIR)
         device_scanner.start()
         run(app, host='0.0.0.0', port=PORT, debug=DEBUG)
 
