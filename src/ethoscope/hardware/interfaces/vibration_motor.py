@@ -9,7 +9,7 @@ class VibrationMotorDevice():
     Class to control a simple vibration motor (like in mobile phones) connected to a GPIO pin.
     This is used to stimulate the whole arena, rather than individual regions.
     """
-    def __init__(self, gpio_pin=10):
+    def __init__(self, gpio_pin=26):
         self._gpio_pin = gpio_pin
         RPi.GPIO.setmode(RPi.GPIO.BOARD)
         RPi.GPIO.setup(self._gpio_pin, RPi.GPIO.OUT, initial=RPi.GPIO.LOW)
@@ -35,7 +35,7 @@ class VibrationMotorDevice():
         RPi.GPIO.output(self._gpio_pin,not RPi.GPIO.input(self._gpio_pin))
 
 class VibrationMotorInterface(BaseInterface):
-    def __init__(self, gpio_pin=10):
+    def __init__(self, gpio_pin=26):
         self._hardware = VibrationMotorDevice(gpio_pin)
         self._last_time = None # The last time this was activated
 
