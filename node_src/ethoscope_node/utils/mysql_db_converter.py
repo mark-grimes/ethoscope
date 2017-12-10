@@ -88,14 +88,14 @@ class MySQLdbConverter(object):
             sqlalchemy_engine = sqlalchemy.create_engine(connection_address)
         else:
             raise Exception("MySQLdbConverter.copy_database() called without a connection address or SQLAlchemy engine")
-        
+
         if skip_tables==None:
             skip_tables=[]
 
         inputMetadata = sqlalchemy.MetaData(bind=self._input_engine)
         inputMetadata.reflect(self._input_engine)
         outputMetadata = sqlalchemy.MetaData(bind=sqlalchemy_engine)
-    
+
         for tableName, inputTable in inputMetadata.tables.iteritems():
             #
             # First copy the schema for the table
@@ -110,6 +110,46 @@ class MySQLdbConverter(object):
             # Then copy the data
             #
             insert = outputTable.insert()
+            # Group the inserts into the destination into batches to speed up the copy.
+            bulkRows = []
+            for row in inputTable.select().execute():
+                bulkRows.append(row)
+                if len(bulkRows) > self._batchSize :
+                    insert.execute(bulkRows)
+                    bulkRows = []
+            if len(bulkRows) > 0 :
+                insert.execute(bulkRows)
+
+    def update_database(self):
+        """
+        Get the last insert and add from there
+        """
+
+        if sqlalchemy_engine:
+            if connection_address!= None : logging.warning("MySQLdbConverter: An SQLAlchemy engine was provided, so the value of connection_address is being ignored")
+        elif connection_address:
+            sqlalchemy_engine = sqlalchemy.create_engine(connection_address)
+        else:
+            raise Exception("MySQLdbConverter.copy_database() called without a connection address or SQLAlchemy engine")
+
+        if skip_tables==None:
+            skip_tables=[]
+
+        inputMetadata = sqlalchemy.MetaData(bind=self._input_engine)
+        inputMetadata.reflect(self._input_engine)
+        outputMetadata = sqlalchemy.MetaData(bind=sqlalchemy_engine)
+
+        for tableName, inputTable in inputMetadata.tables.iteritems():
+            #
+            # First copy the schema for the table
+            #
+            if tableName in skip_tables : continue
+
+            outputTable = sqlalchemy.Table(inputTable.name, outputMetadata)
+            #
+            # Then copy the data
+            #
+            update = outputTable.update()
             # Group the inserts into the destination into batches to speed up the copy.
             bulkRows = []
             for row in inputTable.select().execute():

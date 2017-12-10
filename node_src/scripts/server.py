@@ -18,6 +18,8 @@ import urllib2
 import time
 
 app = Bottle()
+dbbackup = MySQLdbBackupRunner()
+background_db_backup = True #TODO work out a better way to select whether to do copy on request or use background db
 STATIC_DIR = "../static"
 
 def error_decorator(func):
@@ -298,16 +300,25 @@ def dynamic_serve_db(id):
         if format=="sqlite": skip_tables=None
         else: skip_tables=["IMG_SNAPSHOTS"]
 
-        # Usually doesn't work if the file already exists
-        temporaryFilename = "/dev/shm/ethoscope_db.sqlite"
-        try:
-            os.remove(temporaryFilename)
-        except:
-            pass
+        temporaryFilename = ""
+        if background_db_backup:
+            dbbackup.stopbackup()
+            dbbackup.quickupdatedb()
+            dbbackup.runbackup()
+            temporaryFilename = dbbackup.filename()
+        else:
+            # Usually doesn't work if the file already exists
+            temporaryFilename = "/dev/shm/ethoscope_db.sqlite"
+            try:
+                os.remove(temporaryFilename)
+            except:
+                pass
 
-        converter = MySQLdbConverter( remote_host=remote_host )
-        converter.copy_database("sqlite:////"+temporaryFilename, skip_tables=skip_tables)
+            converter = MySQLdbConverter( remote_host=remote_host )
+            converter.copy_database("sqlite:////"+temporaryFilename, skip_tables=skip_tables)
+
         return static_file(temporaryFilename, root="/", download="ethoscope_db.sqlite")
+
     else:
         raise Exception("The format '"+format+"' is not known")
 
@@ -399,6 +410,16 @@ if __name__ == '__main__':
         logging.warning("No watchdog thread is running (either not running under systemd, or 'WatchdogSec' was not set for the service)")
     except Exception as error: # Some other unknown error
         logging.warning("No watchdog thread is running because of error: "+str(error))
+
+    #Add backup runner that will run every hour
+    try:
+        converter = MySQLdbConverter()
+        dbbackup.dbconverter(converter, skip_tables="[IMG_SNAPSHOTS]", dbname_backup="/dev/shm/ethoscope_db.sqlite")
+        dbbackup.runbackup()
+    except Exception as error:
+        logging.warning("No backup process running - will default to copy db on request")
+        background_db_backup = False
+
 
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
     device_scanner = None
