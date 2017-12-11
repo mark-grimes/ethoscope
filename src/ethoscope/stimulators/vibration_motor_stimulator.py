@@ -18,7 +18,7 @@ class VibrationMotorStimulator(BaseStimulator):
     _HardwareInterfaceClass = VibrationMotorInterface
 
     def __init__(self, hardware_connection=None, dates = "", **kwargs):
-        self._vibration_time = [0.2,0.2,0.2,0.2,0.2]
+        self._vibration_time = [0.4,0.2,0.4,0.2,0.4]
 
         self._times = []
         for date in dates.split(","):
