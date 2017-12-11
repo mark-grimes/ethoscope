@@ -73,6 +73,7 @@
             <button class="btn btn-info disable" ng-if="device.status == 'stopping'" ng-click="ethoscope.alert('Please wait, system is stopping')">Stopping</button>
             <button class="btn btn-danger disable" ng-if="device.status == 'initialising'"  ng-click="ethoscope.alert('Please wait, system is starting')">Starting</button>
 
+            <a ng-href="http://{{device.name}}.local:8081" target="_blank" class="btn btn-info">DQM</a>
             <button class="btn btn-info" data-toggle="modal" data-target="#downloadResultsModal">Download results</button>
         <!--<a href="/#/more/browse" class="btn btn-info">Download Data</a>-->
             <button class="btn btn-info" ng-click="ethoscope.log()">Log</button>
