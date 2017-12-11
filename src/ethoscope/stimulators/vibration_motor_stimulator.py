@@ -9,7 +9,8 @@ class VibrationMotorStimulator(BaseStimulator):
     """
     _description = {"overview": "A stimulator to vibrate the whole arena",
                     "arguments": [
-                                    {"type": "datetime", "name": "dates",
+                                    {"type": "str",
+                                     "name": "dates",
                                      "description": "A comma separated list of times to vibrate at, in the form 'YYYY-MM-DD HH:MM:SS', e.g. '2017-09-15 17:30:00, 2017-09-15 21:00:00'",
                                      "default": ""}
                                    ]}
@@ -17,7 +18,7 @@ class VibrationMotorStimulator(BaseStimulator):
     _HardwareInterfaceClass = VibrationMotorInterface
 
     def __init__(self, hardware_connection=None, dates = "", **kwargs):
-        self._vibration_time = [0.2,0.2,0.2,0.2,0.2]
+        self._vibration_time = [0.4,0.2,0.4,0.2,0.4]
 
         self._times = []
         for date in dates.split(","):
