@@ -73,23 +73,23 @@ class ControlThread(Thread):
     _evanescent = False
     _option_dict = {
         "roi_builder":{
-                "possible_classes":[DefaultROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, OlfactionAssayROIBuilder],
+                "possible_classes":[DefaultROIBuilder, SleepMonitorWithTargetROIBuilder],#, TargetGridROIBuilder, OlfactionAssayROIBuilder],
             },
         "tracker":{
                 "possible_classes":[AdaptiveBGModel],
             },
         "interactor":{
                         "possible_classes":[DefaultStimulator, 
-                                            SleepDepStimulator,
-                                            OptomotorSleepDepriver,
-                                            MiddleCrossingStimulator,
-                                            #SystematicSleepDepInteractor,
-                                            ExperimentalSleepDepStimulator,
-                                            #GearMotorSleepDepStimulator,
-                                            #DynamicOdourDeliverer,
-                                            DynamicOdourSleepDepriver,
-                                            OptoMidlineCrossStimulator,
-                                            MiddleCrossingOdourStimulator,
+                                            #SleepDepStimulator,
+                                            #OptomotorSleepDepriver,
+                                            #MiddleCrossingStimulator,
+                                            ##SystematicSleepDepInteractor,
+                                            #ExperimentalSleepDepStimulator,
+                                            ##GearMotorSleepDepStimulator,
+                                            ##DynamicOdourDeliverer,
+                                            #DynamicOdourSleepDepriver,
+                                            #OptoMidlineCrossStimulator,
+                                            #MiddleCrossingOdourStimulator,
                                             VibrationMotorStimulator
                                             ],
                     },
@@ -97,7 +97,7 @@ class ControlThread(Thread):
                         "possible_classes":[DefaultDrawer, NullDrawer],
                     },
         "camera":{
-                        "possible_classes":[OurPiCameraAsync, MovieVirtualCamera, DummyPiCameraAsync, V4L2Camera],
+                        "possible_classes":[OurPiCameraAsync],#, MovieVirtualCamera, DummyPiCameraAsync, V4L2Camera],
                     },
         "result_writer":{
                         "possible_classes":[ResultWriter, SQLiteResultWriter],
