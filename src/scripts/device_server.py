@@ -7,6 +7,7 @@ from bottle import *
 from ethoscope.web_utils.control_thread import ControlThread
 from ethoscope.web_utils.helpers import get_machine_info, get_version, file_in_dir_r
 from ethoscope.web_utils.record import ControlThreadVideoRecording
+from ethoscope.hardware.interfaces.shield_output import ShieldOutput
 from subprocess import call
 import json
 import socket
@@ -194,6 +195,11 @@ if __name__ == '__main__':
 
     version = get_version()
 
+    # If the Rymapt shield is connected, the LEDs are connected to a relay controlled by a GPIO
+    # pin, so they have to be explicitly turned on. If the shield is not connected, the software
+    # should notice and take no action (except print a warning)
+    lights = ShieldOutput(0) # 0 is the leftmost connector
+    lights.on() # Turn the lights on and leave them on permanently
 
     if option_dict["json"]:
         with open(option_dict["json"]) as f:
