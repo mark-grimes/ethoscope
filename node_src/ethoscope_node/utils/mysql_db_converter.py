@@ -62,7 +62,8 @@ class MySQLdbConverter(object):
         else:
             self._input_engine = sqlalchemy.create_engine("mysql://"+remote_user+":"+remote_pass+"@"+remote_host+"/"+remote_db_name)
 
-        self._batchSize = 2000 # The number of inserts to group so that copying is faster
+        self._batchSize = 200 # The number of inserts to group so that copying is faster
+        self._lastID = {}
 
     def copy_database(self, connection_address=None, sqlalchemy_engine = None, skip_tables = None):
         """
@@ -84,8 +85,9 @@ class MySQLdbConverter(object):
         """
         if sqlalchemy_engine:
             if connection_address!= None : logging.warning("MySQLdbConverter: An SQLAlchemy engine was provided, so the value of connection_address is being ignored")
+            self._sqlalchemy_engine = sqlalchemy_engine
         elif connection_address:
-            sqlalchemy_engine = sqlalchemy.create_engine(connection_address)
+            self._sqlalchemy_engine = sqlalchemy.create_engine(connection_address)
         else:
             raise Exception("MySQLdbConverter.copy_database() called without a connection address or SQLAlchemy engine")
 
@@ -94,13 +96,13 @@ class MySQLdbConverter(object):
 
         inputMetadata = sqlalchemy.MetaData(bind=self._input_engine)
         inputMetadata.reflect(self._input_engine)
-        outputMetadata = sqlalchemy.MetaData(bind=sqlalchemy_engine)
+        outputMetadata = sqlalchemy.MetaData(bind=self._sqlalchemy_engine)
 
         for tableName, inputTable in inputMetadata.tables.iteritems():
             #
             # First copy the schema for the table
             #
-            if tableName in skip_tables : continue
+
 
             outputTable = sqlalchemy.Table(inputTable.name, outputMetadata)
             for inputColumn in inputTable.columns:
@@ -112,50 +114,79 @@ class MySQLdbConverter(object):
             insert = outputTable.insert()
             # Group the inserts into the destination into batches to speed up the copy.
             bulkRows = []
+            lastID = None
             for row in inputTable.select().execute():
                 bulkRows.append(row)
+                if tableName == "CONDITIONS":
+                    lastID = row['id']
+                if tableName.startswith("ROI_"):
+                    try: # See if the rest is a number (i.e. not "ROI_MAP")
+                        roi = int(tableName[4:])
+                        lastID = row['id']
+                    except ValueError: continue
+
                 if len(bulkRows) > self._batchSize :
                     insert.execute(bulkRows)
                     bulkRows = []
             if len(bulkRows) > 0 :
                 insert.execute(bulkRows)
+            if lastID != None:
+                self._lastID[tableName] = lastID
 
     def update_database(self):
         """
         Get the last insert and add from there
         """
-
-        if sqlalchemy_engine:
-            if connection_address!= None : logging.warning("MySQLdbConverter: An SQLAlchemy engine was provided, so the value of connection_address is being ignored")
-        elif connection_address:
-            sqlalchemy_engine = sqlalchemy.create_engine(connection_address)
-        else:
-            raise Exception("MySQLdbConverter.copy_database() called without a connection address or SQLAlchemy engine")
-
-        if skip_tables==None:
-            skip_tables=[]
-
         inputMetadata = sqlalchemy.MetaData(bind=self._input_engine)
         inputMetadata.reflect(self._input_engine)
-        outputMetadata = sqlalchemy.MetaData(bind=sqlalchemy_engine)
+        outputMetadata = sqlalchemy.MetaData(bind=self._sqlalchemy_engine)
+        tablesToUpdate = []
+        for tableName in self._sqlalchemy_engine.table_names():
+            if tableName == "CONDITIONS": tablesToUpdate.append(tableName)
+            if tableName.startswith("ROI_"):
+                try: # See if the rest is a number (i.e. not "ROI_MAP")
+                    roi = int(tableName[4:])
+                    tablesToUpdate.append(tableName)
+                except ValueError: continue
 
-        for tableName, inputTable in inputMetadata.tables.iteritems():
-            #
-            # First copy the schema for the table
-            #
-            if tableName in skip_tables : continue
+        # Queries are done in batches so that the results are available as they are created. This
+        # can take a little longer overall, but if running in multiple processes allows getting
+        # some results before the whole thing has finished.
+        while len(tablesToUpdate) > 0:
+            tablesToRemove = [] # Tables that no longer need updating (don't want to remove from tablesToUpdate during the loop)
 
-            outputTable = sqlalchemy.Table(inputTable.name, outputMetadata)
-            #
-            # Then copy the data
-            #
-            update = outputTable.update()
-            # Group the inserts into the destination into batches to speed up the copy.
-            bulkRows = []
-            for row in inputTable.select().execute():
-                bulkRows.append(row)
-                if len(bulkRows) > self._batchSize :
+            for tableName in tablesToUpdate:
+                logging.info("DB BACK UP: Adding table "+tableName)
+
+                inputtable = sqlalchemy.Table( tableName, inputMetadata, autoload=True )
+                outputTable = sqlalchemy.Table( tableName, outputMetadata)
+                try:
+                    startID = self._lastID[tableName]
+                except KeyError:
+                    startID = 0
+
+                if startID != 0:
+                    select = sqlalchemy.select([inputtable]).where(inputtable.c.id > startID)
+                else:
+                    select = sqlalchemy.select([inputtable])
+
+                connection = self._input_engine.connect()
+                results = connection.execute( select )
+                insert = outputTable.insert()
+                # Group the inserts into the destination into batches to speed up the copy.
+                bulkRows = []
+                lastID = 0
+                for row in results:
+                    bulkRows.append(row)
+                    lastID = row['id']
+                    if len(bulkRows) > self._batchSize :
+                        insert.execute(bulkRows)
+                        bulkRows = []
+                if len(bulkRows) > 0 :
                     insert.execute(bulkRows)
-                    bulkRows = []
-            if len(bulkRows) > 0 :
-                insert.execute(bulkRows)
+                self._lastID[tableName] = lastID
+
+                tablesToRemove.append(tableName)
+            # Remove all the tables that are fully up to date before the next loop
+            for tableName in tablesToRemove:
+                tablesToUpdate.remove(tableName)

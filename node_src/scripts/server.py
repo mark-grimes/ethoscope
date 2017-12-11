@@ -7,6 +7,7 @@ from ethoscope_node.utils.helpers import  get_local_ip, get_internet_ip
 from ethoscope_node.utils.device_scanner import DeviceScanner
 from ethoscope_node.utils.mysql_db_writer import MySQLdbCSVWriter
 from ethoscope_node.utils.mysql_db_converter import MySQLdbConverter
+from ethoscope_node.utils.mysql_backup_dqm import MySQLdbBackupRunner
 from os import walk, environ
 import optparse
 import zipfile
@@ -18,9 +19,11 @@ import urllib2
 import time
 
 app = Bottle()
-dbbackup = MySQLdbBackupRunner()
-background_db_backup = True #TODO work out a better way to select whether to do copy on request or use background db
 STATIC_DIR = "../static"
+global dbbackup
+dbbackup = MySQLdbBackupRunner() #used when server recieves download request TODO maybe find a different mechanism
+global background_db_backup
+background_db_backup = True #TODO work out a better way to select whether to do copy on request or use background db
 
 def error_decorator(func):
     """
@@ -143,6 +146,10 @@ def cache_img(file_like, basename):
 @app.post('/device/<id>/controls/<instruction>')
 @error_decorator
 def post_device_instructions(id, instruction):
+    if instruction == 'start':
+        #start the backup process - this will remove the old file so have to ensure that if the user want to download they do it first
+        dbbackup.runbackup(resume_run=False)
+
     post_data = request.body.read()
     device = device_scanner.get_device(id)
     device.send_instruction(instruction, post_data)
@@ -304,7 +311,7 @@ def dynamic_serve_db(id):
         if background_db_backup:
             dbbackup.stopbackup()
             dbbackup.quickupdatedb()
-            dbbackup.runbackup()
+            dbbackup.runbackup(resume_run=True)
             temporaryFilename = dbbackup.filename()
         else:
             # Usually doesn't work if the file already exists
@@ -371,6 +378,8 @@ def watchdog( notifier, url, watchdogTime ):
 #======================================================================================================================#
 
 if __name__ == '__main__':
+
+
     logging.getLogger().setLevel(logging.INFO)
     parser = optparse.OptionParser()
     parser.add_option("-D", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
@@ -414,10 +423,10 @@ if __name__ == '__main__':
     #Add backup runner that will run every hour
     try:
         converter = MySQLdbConverter()
-        dbbackup.dbconverter(converter, skip_tables="[IMG_SNAPSHOTS]", dbname_backup="/dev/shm/ethoscope_db.sqlite")
-        dbbackup.runbackup()
+        dbbackup.dbconverter(converter, skip_tables="[IMG_SNAPSHOTS]", dbname_backup="/tmp/ethoscope/ethoscope_db.sqlite")
+        # dbbackup.runbackup()
     except Exception as error:
-        logging.warning("No backup process running - will default to copy db on request")
+        logging.warning("No backup process running - will default to copy db on request\nError Message:{}".format(error.message))
         background_db_backup = False
 
 

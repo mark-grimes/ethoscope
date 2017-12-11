@@ -6,7 +6,7 @@ do an update.
 __author__ = 'ryanfpage'
 import threading
 import time
-
+import os
 class MySQLdbBackupRunner(object):
     """
     Runner for the MySQL db back up. Runs the update in a seperate thread.
@@ -16,9 +16,12 @@ class MySQLdbBackupRunner(object):
     def __init__(self, ptime=60, dbconv=None):
         self.ptime = ptime
         self.table_setup = False
-
+        self.dbname_backup = None
         if dbconv != None:
             self.dbconv = dbconv
+
+    def filename(self):
+        return self.dbname_backup
 
     def dbconverter(self, dbconv, skip_tables=None, dbname_backup=None):
         """
@@ -29,6 +32,10 @@ class MySQLdbBackupRunner(object):
         """
         self.dbconv = dbconv
         self.skip_tables = skip_tables
+        directory = os.path.dirname(dbname_backup)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
         self.dbname_backup = dbname_backup
 
     def quickupdatedb(self):
@@ -44,16 +51,26 @@ class MySQLdbBackupRunner(object):
         """
         time.sleep(self.ptime*60)
         if self.table_setup == False:
-            self.dbconv.copy_database("sqlite:////"+self.dbname_backup, skip_tables=self.skip_tables )
+            self.dbconv.copy_database("sqlite:////"+self.dbname_backup, skip_tables=self.skip_tables)
             self.table_setup = True
         self.dbconv.update_database()
 
-    def runbackup(self):
+    def runbackup(self, resume_run=False):
         """
-        Start the thread running the updater
+        Start the thread running the updater. Remove existing backup first and reset the table setup flag
         """
-        self.db_thread = threading.Thread(target=self.updatedb)
-        self.db_thread.start()
+        if not resume_run:
+            self.table_setup = False
+            if self.dbname_backup == None:
+                raise Exception("Error no backup file name has been specified")
+            if os.path.isfile(self.dbname_backup):
+                os.remove(self.dbname_backup)
+            self.db_thread = threading.Thread(target=self.updatedb)
+            self.db_thread.start()
+        else:
+            self.db_thread = threading.Thread(target=self.updatedb)
+            self.db_thread.start()
+
 
     def stopbackup(self):
         """
