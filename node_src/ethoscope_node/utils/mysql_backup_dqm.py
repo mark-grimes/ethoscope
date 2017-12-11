@@ -17,6 +17,7 @@ class MySQLdbBackupRunner(object):
         self.ptime = ptime
         self.table_setup = False
         self.dbname_backup = None
+        self.running = False
         if dbconv != None:
             self.dbconv = dbconv
 
@@ -60,15 +61,19 @@ class MySQLdbBackupRunner(object):
         Start the thread running the updater. Remove existing backup first and reset the table setup flag
         """
         if not resume_run:
+            if self.running:
+                self.stopbackup()
             self.table_setup = False
             if self.dbname_backup == None:
                 raise Exception("Error no backup file name has been specified")
             if os.path.isfile(self.dbname_backup):
                 os.remove(self.dbname_backup)
             self.db_thread = threading.Thread(target=self.updatedb)
+            self.running = True
             self.db_thread.start()
         else:
             self.db_thread = threading.Thread(target=self.updatedb)
+            self.running = True
             self.db_thread.start()
 
 
@@ -76,4 +81,5 @@ class MySQLdbBackupRunner(object):
         """
         Stop thread - TODO check that this will join once the function has finished executing
         """
+        self.running = False
         self.db_thread.join()
