@@ -76,7 +76,9 @@ class MySQLdbConverter(object):
 
             http://docs.sqlalchemy.org/en/latest/core/engines.html
 
-        This function is highly likely to fail if the file already exists.
+        If the file already exists then copying will skip the number of rows already in the output. This means that the newer
+        input can only be different by extra rows on the end - if the input has inserts part way into the table you will get
+        duplicate and/or missing data in the output.
 
         You can also provide a list of table names that will not be included in the copy with the "skip_tables" parameter. E.g.
         'skip_tables=["IMG_SNAPSHOTS"]' will not include image snapshots in the copied database and will save a considerable
@@ -95,6 +97,12 @@ class MySQLdbConverter(object):
         inputMetadata = sqlalchemy.MetaData(bind=self._input_engine)
         inputMetadata.reflect(self._input_engine)
         outputMetadata = sqlalchemy.MetaData(bind=sqlalchemy_engine)
+        outputMetadata.reflect(sqlalchemy_engine)
+
+        # If the input has been wiped since the last copy, wipe everything from the output too
+        if self._hasChanged( inputMetadata, outputMetadata ):
+            outputMetadata.drop_all()
+            outputMetadata.clear()
     
         for tableName, inputTable in inputMetadata.tables.iteritems():
             #
@@ -102,20 +110,47 @@ class MySQLdbConverter(object):
             #
             if tableName in skip_tables : continue
 
-            outputTable = sqlalchemy.Table(inputTable.name, outputMetadata)
-            for inputColumn in inputTable.columns:
-                outputTable.append_column(inputColumn.copy())
-            outputTable.create()
+            try:
+                outputTable = outputMetadata.tables[tableName]
+                needToCreateTable = False
+            except KeyError:
+                needToCreateTable = True
+
+            if needToCreateTable:
+                outputTable = sqlalchemy.Table(inputTable.name, outputMetadata)
+                for inputColumn in inputTable.columns:
+                    outputTable.append_column(inputColumn.copy())
+                outputTable.create()
             #
             # Then copy the data
             #
             insert = outputTable.insert()
+            select = inputTable.select()
+            if not needToCreateTable:
+                # Find out how many rows are already in the output, and skip that number from the input
+                numOutputRows=sqlalchemy.func.count(outputTable.columns.items()[0][1]).scalar()
+                select = select.offset(numOutputRows)
+
             # Group the inserts into the destination into batches to speed up the copy.
             bulkRows = []
-            for row in inputTable.select().execute():
+            for row in select.execute():
                 bulkRows.append(row)
                 if len(bulkRows) > self._batchSize :
                     insert.execute(bulkRows)
                     bulkRows = []
             if len(bulkRows) > 0 :
                 insert.execute(bulkRows)
+
+    def _hasChanged(self, metadata1, metadata2):
+        """Checks to see if 'SELECT value FROM METADATA WHERE field="date_time"' is the same between the two databases.
+        Ideally this check would not be hard coded to a particular schema, but I can worry about the general case later."""
+        try:
+            table=metadata1.tables["METADATA"]
+            fieldCol=table.columns["field"]
+            value1=table.select().where(fieldCol=="date_time").execute().first().value
+
+            table=metadata2.tables["METADATA"]
+            fieldCol=table.columns["field"]
+            return value1 != table.select().where(fieldCol=="date_time").execute().first().value
+        except Exception as error:
+            return False
