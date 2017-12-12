@@ -99,7 +99,10 @@ class MySQLdbConverter(object):
         outputMetadata = sqlalchemy.MetaData(bind=sqlalchemy_engine)
         outputMetadata.reflect(sqlalchemy_engine)
 
-        force_new = False # TODO calculate if the output needs to be wiped and set this to True
+        # If the input has been wiped since the last copy, wipe everything from the output too
+        if self._hasChanged( inputMetadata, outputMetadata ):
+            outputMetadata.drop_all()
+            outputMetadata.clear()
     
         for tableName, inputTable in inputMetadata.tables.iteritems():
             #
@@ -107,13 +110,11 @@ class MySQLdbConverter(object):
             #
             if tableName in skip_tables : continue
 
-            needToCreateTable = True
             try:
                 outputTable = outputMetadata.tables[tableName]
-                if force_new: outputTable.drop()
-                else: needToCreateTable = False
+                needToCreateTable = False
             except KeyError:
-                pass # needToCreateTable is already True
+                needToCreateTable = True
 
             if needToCreateTable:
                 outputTable = sqlalchemy.Table(inputTable.name, outputMetadata)
@@ -139,3 +140,17 @@ class MySQLdbConverter(object):
                     bulkRows = []
             if len(bulkRows) > 0 :
                 insert.execute(bulkRows)
+
+    def _hasChanged(self, metadata1, metadata2):
+        """Checks to see if 'SELECT value FROM METADATA WHERE field="date_time"' is the same between the two databases.
+        Ideally this check would not be hard coded to a particular schema, but I can worry about the general case later."""
+        try:
+            table=metadata1.tables["METADATA"]
+            fieldCol=table.columns["field"]
+            value1=table.select().where(fieldCol=="date_time").execute().first().value
+
+            table=metadata2.tables["METADATA"]
+            fieldCol=table.columns["field"]
+            return value1 != table.select().where(fieldCol=="date_time").execute().first().value
+        except Exception as error:
+            return False
