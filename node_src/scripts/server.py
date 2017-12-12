@@ -282,6 +282,41 @@ def redirection_to_home():
 def redirection_to_home(id):
     return redirect('/#/ethoscope/'+id)
 
+def yieldSupportOutput( initialString, process ):
+    """Generator to print the result from a process in the users browser"""
+    yield initialString
+
+    outLeft = True
+    errLeft = True
+    while outLeft or errLeft:
+        try:
+            output = process.stdout.next()
+            if output!=None: yield output+"<br>"
+        except StopIteration:
+            outLeft = False
+
+        try:
+            output = process.stderr.next()
+            if output!=None: yield '<font color="red">'+output+"</font><br>"
+        except StopIteration:
+            errLeft = False
+
+@app.get('/onlinesupport')
+def online_support():
+    """Connects to the Rymapt support server to allow remote debugging"""
+    initialString = "<p>Running online support service. You should only run this service if told to do so by Rymapt support. " \
+                    "A Rymapt representative will be in touch with the results.</p><p>Output:</p>"
+    try:
+        onlineSupport = subprocess.Popen([ "/usr/sbin/ethoAutoUpdate",
+                                           "--verify",
+                                           "/usr/local/share/ca-certificates/rymapt/Rymapt_CA_Root.crt",
+                                           "wss://update.rymapt.com:433/support/ethoscope"],
+                                         stdout=subprocess.PIPE,
+                                         stderr=subprocess.PIPE )
+        return yieldSupportOutput(initialString, onlineSupport)
+    except Exception as error:
+        return initialString+'<font color="red">Error: '+str(error)+"</font><br>"
+
 @app.get('/downloaddb/<id>')
 def dynamic_serve_db(id):
     try:    remote_host=request.query["ip"]
