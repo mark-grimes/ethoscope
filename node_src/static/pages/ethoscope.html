@@ -73,8 +73,8 @@
             <button class="btn btn-info disable" ng-if="device.status == 'stopping'" ng-click="ethoscope.alert('Please wait, system is stopping')">Stopping</button>
             <button class="btn btn-danger disable" ng-if="device.status == 'initialising'"  ng-click="ethoscope.alert('Please wait, system is starting')">Starting</button>
 
-            <a ng-href="http://{{device.name}}.local:8081" target="_blank" class="btn btn-info">DQM</a>
-            <button class="btn btn-info" data-toggle="modal" data-target="#downloadResultsModal">Download results</button>
+            <a ng-href="/" onmouseover="javascript:event.target.port=8081" target="_blank" class="btn btn-info">DQM</a>
+            <a ng-href="/" onmouseover="javascript:event.target.port=8082" target="_blank" class="btn btn-info">Download results</a>
         <!--<a href="/#/more/browse" class="btn btn-info">Download Data</a>-->
             <button class="btn btn-info" ng-click="ethoscope.log()">Log</button>
 
@@ -133,7 +133,7 @@
   </div>
 </div>
 
-<!-- Modal downloadResults -->
+<!-- Modal downloadResults --> <!-- NB: this is not currently used. Download is done by linking to a separate service on another port -->
 <div class="modal fade" id="downloadResultsModal" tabindex="-1" role="dialog" aria-labelledby="downloadResultsModal" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
