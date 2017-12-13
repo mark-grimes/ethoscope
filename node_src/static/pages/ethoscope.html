@@ -69,7 +69,9 @@
 
         <div ng-if="device.status != 'not_in_use'">
             <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'"  data-toggle="modal" data-target="#startModal">Start tracking</button>
+            <!-- Don't currently have a way to retrieve the results, so temporarily disable feature to record video
             <button class="btn btn-info" ng-if="device.status == 'stopped'" data-toggle="modal" data-target="#recordModal">Record video</button>
+            -->
             <button class="btn btn-danger" ng-if="device.status == 'running' || device.status == 'recording'"   data-toggle="modal" data-target="#stopTrackingModal">Stop</button>
 
             <button class="btn btn-info disable" ng-if="device.status == 'stopping'" ng-click="ethoscope.alert('Please wait, system is stopping')">Stopping</button>
