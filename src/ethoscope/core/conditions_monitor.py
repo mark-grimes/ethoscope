@@ -159,7 +159,8 @@ class ConditionsMonitor(object):
         self._keepRunning.value = False
         with self._pollingCondition:
             self._pollingCondition.notify() # Wake rather than wait for the full polling time
-        self._process.join()
+        if self._process.is_alive():
+            self._process.join()
 
     def updatePeriod(self):
         """
