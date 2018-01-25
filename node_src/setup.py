@@ -26,6 +26,8 @@ setup(
         "futures >= 3.0.3",
         "GitPython >=1.0.1",
         "bjoern >= 1.4.2",
-        "scapy == 2.3.2"
+        "scapy == 2.3.2",
+        "zeroconf >= 0.19.1",
+        "sdnotify >= 0.3.2"
     ],
 )

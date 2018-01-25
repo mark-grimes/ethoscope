@@ -19,19 +19,15 @@ class MySQLdbToSQlite(object):
                             remote_pass="ethoscope",
                             overwrite=False):
         """
-
         A class to backup remote psv MySQL data base into a local sqlite3 one.
         The name of the static (not updated during run) and the dynamic tables is hardcoded.
         The `update_roi_tables` method will fetch only the new datapoint at each run.
-
         :param dst_path: where to save the data (expect a `.db` file)
         :param remote_db_name: the name of the remote database
         :param remote_host: the ip of the database
         :param remote_user: the user name for the remote database
         :param remote_pass: teh password for the remote database
         :param overwrite: whether the destination file should be overwritten. If False, data are appended to it
-
-
         """
 
         self._remote_host = remote_host
@@ -135,7 +131,6 @@ class MySQLdbToSQlite(object):
     def update_roi_tables(self):
         """
         Fetch new ROI tables and new data points in the remote and use them to update local db
-
         :return:
         """
 
@@ -288,5 +283,3 @@ class MySQLdbToSQlite(object):
             command = "INSERT INTO %s (id,t,img) VALUES(?,?,?);" % table_name
             dst_cur.execute(command, [id,t,sqlite3.Binary(img)])
             dst.commit()
-
-

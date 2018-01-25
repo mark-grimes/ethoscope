@@ -9,6 +9,11 @@
         <h2 id="dt_warning"><span class="fa fa-warning"></span> There is more than 5min difference between node and this device!!</h2>
         </div>
 
+        <div ng-if="browser_delta_t_min > 5">
+           <h2 id="dt_warning"><span class="fa fa-warning"></span>There is more than 5min difference between this device and your browser!!</h2>
+           <button ng-if="device.status == 'stopped'" class="btn btn-danger" ng-click="ethoscope.set_time_from_browser()">Set device time from browser</button>
+           <div ng-if="device.status != 'stopped'"><h3>The device time can be set from the browser only when the device is stopped</h3></div>
+        </div>
 
 
 
@@ -36,8 +41,10 @@
         <div ng-if="device.status == 'running'">
             <p>Processing speed: {{device.monitor_info.fps}} FPS</p>
 
+            <!-- Temporarily take out things not working
             <p>Your file will be saved as: <a href="/download{{device.backup_path}}" target="_blank" data-toggle="tooltip" data-placement="top" title="{{device.backup_path}}">{{ethoscope.readable_url(device.backup_path)}}</a></p>
             <p>Time since last backup: {{ethoscope.elapsedtime(device.time_since_backup)}}</p>
+            -->
 
         </div>
 
@@ -62,14 +69,20 @@
 
         <div ng-if="device.status != 'not_in_use'">
             <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'"  data-toggle="modal" data-target="#startModal">Start tracking</button>
+            <!-- Don't currently have a way to retrieve the results, so temporarily disable feature to record video
             <button class="btn btn-info" ng-if="device.status == 'stopped'" data-toggle="modal" data-target="#recordModal">Record video</button>
+            -->
             <button class="btn btn-danger" ng-if="device.status == 'running' || device.status == 'recording'"   data-toggle="modal" data-target="#stopTrackingModal">Stop</button>
 
             <button class="btn btn-info disable" ng-if="device.status == 'stopping'" ng-click="ethoscope.alert('Please wait, system is stopping')">Stopping</button>
             <button class="btn btn-danger disable" ng-if="device.status == 'initialising'"  ng-click="ethoscope.alert('Please wait, system is starting')">Starting</button>
 
+            <a ng-href="/" onmouseover="javascript:event.target.port=8081" target="_blank" class="btn btn-info">DQM</a>
+            <a ng-href="/" onmouseover="javascript:event.target.port=8082" target="_blank" class="btn btn-info">Download results</a>
         <!--<a href="/#/more/browse" class="btn btn-info">Download Data</a>-->
+        <!--  Temporarily disable this until it works properly
             <button class="btn btn-info" ng-click="ethoscope.log()">Log</button>
+        -->
 
             <button class="btn btn-danger" data-toggle="modal" data-target="#powerOffAlert">Power off Device</button>
         </div>
@@ -121,6 +134,28 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
         <button type="button" class="btn btn-primary" ng-click="ethoscope.poweroff()">Download All</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal downloadResults --> <!-- NB: this is not currently used. Download is done by linking to a separate service on another port -->
+<div class="modal fade" id="downloadResultsModal" tabindex="-1" role="dialog" aria-labelledby="downloadResultsModal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="downloadResultsModalLabel">Download results</h4>
+      </div>
+      <div class="modal-body">
+        <input type="radio" name="download_format" value="tab"/>As tab separated values (doesn't include conditions data)<br/>
+        <input type="radio" name="download_format" value="sqlite"/>Full database as SQLite3 file<br/>
+        <input type="radio" name="download_format" value="sqlite-slim" checked/>As SQLite3 file but without image snapshots (considerably smaller files)<br/>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" ng-click="ethoscope.downloaddb()" data-dismiss="modal">Download</button>
+        <a id="downloaddbHiddenLink"></a> <!-- Firefox requires a link to be in the DOM to do "click()" on it -->
       </div>
     </div>
   </div>

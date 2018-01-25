@@ -5,13 +5,17 @@ import logging
 import traceback
 from ethoscope_node.utils.helpers import  get_local_ip, get_internet_ip
 from ethoscope_node.utils.device_scanner import DeviceScanner
-from os import walk
+from ethoscope_node.utils.mysql_db_writer import MySQLdbCSVWriter
+from ethoscope_node.utils.mysql_db_converter import MySQLdbConverter
+from os import walk, environ
 import optparse
 import zipfile
 import datetime
 import fnmatch
 import tempfile
 import shutil
+import urllib2
+import time
 
 app = Bottle()
 STATIC_DIR = "../static"
@@ -278,6 +282,70 @@ def redirection_to_home():
 def redirection_to_home(id):
     return redirect('/#/ethoscope/'+id)
 
+def yieldSupportOutput( initialString, process ):
+    """Generator to print the result from a process in the users browser"""
+    yield initialString
+
+    outLeft = True
+    errLeft = True
+    while outLeft or errLeft:
+        try:
+            output = process.stdout.next()
+            if output!=None: yield output+"<br>"
+        except StopIteration:
+            outLeft = False
+
+        try:
+            output = process.stderr.next()
+            if output!=None: yield '<font color="red">'+output+"</font><br>"
+        except StopIteration:
+            errLeft = False
+
+@app.get('/onlinesupport')
+def online_support():
+    """Connects to the Rymapt support server to allow remote debugging"""
+    initialString = "<p>Running online support service. You should only run this service if told to do so by Rymapt support. " \
+                    "A Rymapt representative will be in touch with the results.</p><p>Output:</p>"
+    try:
+        onlineSupport = subprocess.Popen([ "/usr/sbin/ethoAutoUpdate",
+                                           "--verify",
+                                           "/usr/local/share/ca-certificates/rymapt/Rymapt_CA_Root.crt",
+                                           "wss://update.rymapt.com:433/support/ethoscope"],
+                                         stdout=subprocess.PIPE,
+                                         stderr=subprocess.PIPE )
+        return yieldSupportOutput(initialString, onlineSupport)
+    except Exception as error:
+        return initialString+'<font color="red">Error: '+str(error)+"</font><br>"
+
+@app.get('/downloaddb/<id>')
+def dynamic_serve_db(id):
+    try:    remote_host=request.query["ip"]
+    except: remote_host="localhost"
+
+    try:    format=request.query["format"]
+    except: format="tab"
+
+    if format=="tab":
+        response.headers["Content-Disposition"]="attachment; filename=ethoscope_db.txt"
+        converter = MySQLdbCSVWriter( remote_host=remote_host )
+        return converter.enumerate_roi_tables()
+    elif format=="sqlite" or format=="sqlite-slim":
+        if format=="sqlite": skip_tables=None
+        else: skip_tables=["IMG_SNAPSHOTS"]
+
+        # Usually doesn't work if the file already exists
+        temporaryFilename = "/dev/shm/ethoscope_db.sqlite"
+        try:
+            os.remove(temporaryFilename)
+        except:
+            pass
+
+        converter = MySQLdbConverter( remote_host=remote_host )
+        converter.copy_database("sqlite:////"+temporaryFilename, skip_tables=skip_tables)
+        return static_file(temporaryFilename, root="/", download="ethoscope_db.sqlite")
+    else:
+        raise Exception("The format '"+format+"' is not known")
+
 @app.get('/device/<id>/ip')
 @error_decorator
 def redirection_to_home(id):
@@ -297,7 +365,32 @@ def redirection_to_more(action):
 def close(exit_status=0):
     logging.info("Closing server")
     os._exit(exit_status)
-    
+
+def watchdog( notifier, url, watchdogTime ):
+    """
+    Loop running on another thread that periodically checks the webpage is available, and
+    sends a signal (presumably to systemd) to say that the process is still alive.
+    """
+    watchdogTime=float(watchdogTime)
+    logging.debug("Watchdog time is "+str(watchdogTime))
+    while True:
+        urlIsAvailable = False
+        for delay in [5,10,15,0]: # Try to get the URL four times
+            try:
+                urllib2.urlopen(url)
+                urlIsAvailable = True
+                break
+            except Exception as error:
+                logging.warning("Watchdog failed to get url '"+url+"', trying again in "+str(delay)+" seconds")
+                pass # Wait a bit and try again
+            time.sleep(delay)
+        if not urlIsAvailable:
+            logging.error("Watchdog failed to get url '"+url+"' on successive attempts. Watchdog is quitting, systemd will probably restart the service soon")
+            break
+        logging.debug("Sending watchdog signal")
+        notifier.notify("WATCHDOG=1")
+        time.sleep( watchdogTime*0.75 ) # 0.75 to give an arbitrary amount of leeway
+
 
 #======================================================================================================================#
 
@@ -319,7 +412,6 @@ if __name__ == '__main__':
     DEBUG = option_dict["debug"]
     RESULTS_DIR = option_dict["results_dir"]
     max_address = 255 if DEBUG else 5
-    LOCAL_IP = get_local_ip(option_dict["subnet_ip"], max_node_subnet_address=max_address, localhost=option_dict["local"])
 
     try:
         WWW_IP = get_internet_ip()
@@ -328,13 +420,27 @@ if __name__ == '__main__':
         logging.warning(traceback.format_exc(e))
         WWW_IP = None
 
+    # See if systemd is expecting notifications to say we're still alive. If
+    # it does then the WATCHDOG_USEC environment variable will be set.
+    try:
+        # Convert time from micro sec to seconds
+        watchdogTime = float( environ["WATCHDOG_USEC"] )/1000000
+        import sdnotify
+        watchdogUrl="http://localhost:"+str(PORT)
+        watchdogThread=threading.Thread( target=watchdog, args=(sdnotify.SystemdNotifier(), watchdogUrl, watchdogTime) )
+        watchdogThread.start()
+        logging.info("Watchdog thread started checking '"+watchdogUrl+"' and reporting at least every "+str(watchdogTime)+" seconds")
+    except KeyError as error: # Env variable WATCHDOG_USEC not set
+        logging.warning("No watchdog thread is running (either not running under systemd, or 'WatchdogSec' was not set for the service)")
+    except Exception as error: # Some other unknown error
+        logging.warning("No watchdog thread is running because of error: "+str(error))
+
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
     device_scanner = None
     try:
-        device_scanner = DeviceScanner(LOCAL_IP, results_dir=RESULTS_DIR)
-        #device_scanner = DeviceScanner( results_dir=RESULTS_DIR)
+        device_scanner = DeviceScanner(results_dir=RESULTS_DIR)
         device_scanner.start()
-        run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
+        run(app, host='0.0.0.0', port=PORT, debug=DEBUG)
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")

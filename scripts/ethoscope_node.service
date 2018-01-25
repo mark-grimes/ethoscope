@@ -10,6 +10,7 @@ WorkingDirectory=/opt/ethoscope-git/node_src/scripts
 ExecStart=/usr/bin/python2  /opt/ethoscope-git/node_src/scripts/server.py
 RestartSec=5
 Restart=always
+WatchdogSec=40
 
 [Install]
 WantedBy=multi-user.target

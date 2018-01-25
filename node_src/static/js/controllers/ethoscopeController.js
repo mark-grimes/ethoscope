@@ -170,6 +170,35 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             $http.get($scope.device.ip+':9000/static'+$scope.result_files);
         };
 
+        $scope.ethoscope.downloaddb = function(format){
+            // Can't figure out how to do this querySelector on the HTML side, so do it
+            // here instead. I'd prefer to not have to know the input name at this point.
+            try{
+                if( format==undefined ) format=document.querySelector('input[name="download_format"]:checked').value;
+            }
+            catch(error){
+                console.error("Unable to get the format for the database download",error);
+            }
+
+            var downloadLink=$("#downloaddbHiddenLink")
+            downloadLink.attr({
+                href: "/downloaddb/"+device_id+"?ip="+$scope.device.ip + (format!=undefined ? "&format="+format : ""),
+                target: "_blank"
+                })
+            downloadLink[0].click();
+        };
+
+        $scope.ethoscope.set_time_from_browser = function(){
+            var date = new Date();
+            $http.post('/device/'+device_id+'/controls/settime',
+                    data={
+                        "month": date.getUTCMonth()+1, // I want it 1..12, but getUTCMonth() is 0..11
+                        "date": date.getUTCDate(),
+                        "hours": date.getUTCHours(),
+                        "minutes": date.getUTCMinutes()
+                    });
+        };
+
         $scope.ethoscope.log = function(){
             var log_file_path = ''
             if ($scope.showLog == false){
@@ -240,6 +269,8 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                 if("current_timestamp" in data){
                     $scope.device_timestamp = new Date(data.current_timestamp*1000);
                     $scope.device_datetime = $scope.device_timestamp.toUTCString();
+                    browser_time = new Date();
+                    $scope.browser_delta_t_min = (browser_time - $scope.device_timestamp) / 1000 / 60;
                     $http.get('/node/timestamp').success(function(data_node){
                         node_t = data_node.timestamp;
                         node_time = new Date(node_t*1000);

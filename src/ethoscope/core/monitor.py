@@ -3,6 +3,7 @@ __author__ = 'quentin'
 from tracking_unit import TrackingUnit
 import logging
 import traceback
+import urllib2
 
 
 class Monitor(object):
@@ -97,6 +98,11 @@ class Monitor(object):
         try:
             logging.info("Monitor starting a run")
             self._is_running = True
+
+            try: # Tell the DQM server to reset
+                urllib2.urlopen("http://localhost:8081/reset")
+            except:
+                pass
 
             for i,(t, frame) in enumerate(self._camera):
 

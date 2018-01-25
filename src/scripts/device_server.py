@@ -7,8 +7,11 @@ from bottle import *
 from ethoscope.web_utils.control_thread import ControlThread
 from ethoscope.web_utils.helpers import get_machine_info, get_version, file_in_dir_r
 from ethoscope.web_utils.record import ControlThreadVideoRecording
+from ethoscope.hardware.interfaces.shield_output import ShieldOutput
 from subprocess import call
 import json
+import socket
+from zeroconf import ServiceInfo, Zeroconf
 
 api = Bottle()
 
@@ -128,6 +131,12 @@ def controls(id, action):
 
         control.start()
         return info(id)
+    elif action == 'settime':
+        # TODO check the status of ntp and maybe refuse to set the time if ntp is working
+        timeString="%02d%02d%02d%02d" % (request.json["month"],request.json["date"],request.json["hours"],request.json["minutes"])
+        logging.warning("Requested that the time be set to "+str(timeString))
+        call( ["date", "--utc", timeString] )
+        return info(id)
     else:
         raise Exception("No such action: %s" % action)
 
@@ -186,6 +195,11 @@ if __name__ == '__main__':
 
     version = get_version()
 
+    # If the Rymapt shield is connected, the LEDs are connected to a relay controlled by a GPIO
+    # pin, so they have to be explicitly turned on. If the shield is not connected, the software
+    # should notice and take no action (except print a warning)
+    lights = ShieldOutput(0) # 0 is the leftmost connector
+    lights.on() # Turn the lights on and leave them on permanently
 
     if option_dict["json"]:
         with open(option_dict["json"]) as f:
@@ -224,11 +238,42 @@ if __name__ == '__main__':
         control.start()
 
     try:
-        run(api, host='0.0.0.0', port=port, server='cherrypy',debug=option_dict["debug"])
+        # Register the ethoscope using zeroconf so that the node knows about it.
+        # I need an address to register the service, but I don't understand which one (different
+        # interfaces will have different addresses). The python module zeroconf fails if I don't
+        # provide one, and the way it gets supplied doesn't appear to be IPv6 compatible. I'll put
+        # in whatever I get from "gethostbyname" but not trust that in the code on the node side.
+        hostname=socket.gethostname()
+        address=socket.gethostbyname(hostname+".local")
+        serviceInfo = ServiceInfo("_ethoscope._tcp.local.",
+                        hostname+"._ethoscope._tcp.local.",
+                        address=socket.inet_aton(address),
+                        port=port,
+                        properties={
+                            'version': '0.0.1',
+                            'id_page': '/id',
+                            'user_options_page': '/user_options',
+                            'static_page': '/static',
+                            'controls_page': '/controls',
+                            'user_options_page': '/user_options'
+                        } )
+        zeroconf = Zeroconf()
+        zeroconf.register_service(serviceInfo)
+        run(api, host='0.0.0.0', port=port, debug=option_dict["debug"])
     except Exception as e:
         logging.error(e)
+        try:
+            zeroconf.unregister_service(serviceInfo)
+            zeroconf.close()
+        except:
+            pass
         close(1)
     finally:
+        try:
+            zeroconf.unregister_service(serviceInfo)
+            zeroconf.close()
+        except:
+            pass
         close()
 
 
