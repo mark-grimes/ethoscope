@@ -79,7 +79,7 @@ class ControlThread(Thread):
                 "possible_classes":[AdaptiveBGModel],
             },
         "interactor":{
-                        "possible_classes":[DefaultStimulator, 
+                        "possible_classes":[DefaultStimulator,
                                             #SleepDepStimulator,
                                             #OptomotorSleepDepriver,
                                             #MiddleCrossingStimulator,
@@ -106,12 +106,12 @@ class ControlThread(Thread):
                         "possible_classes":[ExperimentalInformations],
                 }
      }
-    
+
     #some classes do not need to be offered as choices to the user in normal conditions
     #these are shown only if the machine is not a PI
     _is_a_rPi = isMachinePI()
     _hidden_options = {'camera', 'result_writer'}
-    
+
     for k in _option_dict:
         _option_dict[k]["class"] =_option_dict[k]["possible_classes"][0]
         _option_dict[k]["kwargs"] ={}
@@ -234,7 +234,7 @@ class ControlThread(Thread):
 
         Class = eval(subdata["name"])
         kwargs = subdata["arguments"]
-    
+
         return Class, kwargs
 
 
@@ -300,7 +300,7 @@ class ControlThread(Thread):
 
         #Here the stimulator passes args. Hardware connection was previously open as thread.
         stimulators = [StimulatorClass(hardware_connection, **stimulator_kwargs) for _ in rois]
-        
+
         kwargs = self._monit_kwargs.copy()
         kwargs.update(tracker_kwargs)
 
@@ -335,9 +335,10 @@ class ControlThread(Thread):
         self._info["status"] = "running"
         logging.info("Setting monitor status as running: '%s'" % self._info["status"])
 
-        # Align the times in the database tables as closely as possible. The conditions monitor only updates
-        # every 30 seconds by default, so some small difference is acceptable.
-        self._conditionsMonitor.setTime(0)
+        # Set all times in the database to be relative to the start of the run. Usually this means setting
+        # to zero, unless continuing a previous run (e.g. after power failure). self._monit handles this
+        # internally. The "1000" is so that everything is in milliseconds.
+        self._conditionsMonitor.setTime( (time.time()-camera.start_time)*1000, 1000 )
         self._conditionsMonitor.run(dbConnectionString) # This runs asynchronously
         self._monit.run(result_writer, self._drawer) # This blocks
 
@@ -348,7 +349,7 @@ class ControlThread(Thread):
 
     def _save_pickled_state(self, camera, result_writer, rois,   TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs):
-                            
+
         """
         note that cv2.videocapture is not a serializable object and cannot be pickled
         """
@@ -402,11 +403,11 @@ class ControlThread(Thread):
         exp_info_kwargs = self._option_dict["experimental_info"]["kwargs"]
         self._info["experimental_info"] = ExpInfoClass(**exp_info_kwargs).info_dic
         self._info["time"] = cam.start_time
-        
+
         #here the hardwareconnection call the interface class without passing any argument!
         hardware_connection = HardwareConnection(HardWareInterfaceClass)
-        
-        
+
+
         self._metadata = {
             "machine_id": self._info["id"],
             "machine_name": self._info["name"],
@@ -443,11 +444,11 @@ class ControlThread(Thread):
                 logging.error("Could not load previous state for unexpected reason:")
                 raise e
                 #cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
-            
+
             with rw as result_writer:
                 if cam.canbepickled:
                     self._save_pickled_state(cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
-                
+
                 self._start_tracking(cam, result_writer, rois, TrackerClass, tracker_kwargs,
                                      hardware_connection, StimulatorClass, stimulator_kwargs)
             self.stop()
@@ -518,4 +519,3 @@ class ControlThread(Thread):
 
     def set_evanescent(self, value=True):
         self._evanescent = value
-
