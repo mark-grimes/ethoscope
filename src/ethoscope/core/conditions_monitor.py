@@ -193,7 +193,7 @@ class ConditionsMonitor(object):
         """
         self._process._timeOffset.value = time.time() - float(referenceTime)/float(coefficient)
         self._process._timeCoefficient.value = coefficient
-        
+
     def tableName(self):
         """
         Get the name of the database table results are written to
