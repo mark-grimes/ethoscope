@@ -335,9 +335,10 @@ class ControlThread(Thread):
         self._info["status"] = "running"
         logging.info("Setting monitor status as running: '%s'" % self._info["status"])
 
-        # Align the times in the database tables as closely as possible. The conditions monitor only updates
-        # every 30 seconds by default, so some small difference is acceptable.
-        self._conditionsMonitor.setTime(0)
+        # Set all times in the database to be relative to the start of the run. Usually this means setting
+        # to zero, unless continuing a previous run (e.g. after power failure). self._monit handles this
+        # internally. The "1000" is so that everything is in milliseconds.
+        self._conditionsMonitor.setTime( (time.time()-camera.start_time)*1000, 1000 )
         self._conditionsMonitor.run(dbConnectionString) # This runs asynchronously
         self._monit.run(result_writer, self._drawer) # This blocks
 
