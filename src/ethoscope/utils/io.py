@@ -613,6 +613,11 @@ class SQLiteResultWriter(ResultWriter):
     def _create_table(self, name, fields, engine=None):
 
         fields = fields.replace("NOT NULL", "")
+        # Remove any double spaces to make the next replacements easier
+        while fields.find("  ")!=-1: fields = fields.replace("  "," ")
+        fields = fields.replace("AUTO_INCREMENT PRIMARY KEY", "PRIMARY KEY AUTOINCREMENT")
+        # For some reason SQLite only uses a column as the row ID if the type is "INTEGER" and not "INT"
+        fields = fields.replace("INT PRIMARY KEY", "INTEGER PRIMARY KEY")
         command = "CREATE TABLE IF NOT EXISTS %s (%s)" % (name,fields)
         logging.info("Creating database table with: " + command)
         self._write_async_command(command)
