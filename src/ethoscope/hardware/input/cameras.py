@@ -355,6 +355,9 @@ class PiFrameGrabber(multiprocessing.Process):
         self._target_fps = target_fps
         self._target_resolution = target_resolution
         self._analog_gain = multiprocessing.Value("f", -1.0)
+        self._video_prefix = None
+        self._bitrate = 200000
+        self._VIDEO_CHUNCK_DURATION = 5*60 # Split video into 5 minute chunks
         super(PiFrameGrabber, self).__init__()
 
 
@@ -380,7 +383,13 @@ class PiFrameGrabber(multiprocessing.Process):
                 capture.framerate = self._target_fps
                 raw_capture = PiRGBArray(capture, size=self._target_resolution)
 
-                for frame in capture.capture_continuous(raw_capture, format="bgr", use_video_port=True):
+                if self._video_prefix != None:
+                    i = 0
+                    capture.start_recording(self._make_video_name(i), bitrate=self._bitrate)
+                    start_time = time.time()
+
+                while True:
+                    capture.capture(raw_capture, format="bgr", use_video_port=True)
                     if not self._stop_queue.empty():
                         logging.warning("The stop queue is not empty. Stop acquiring frames")
 
@@ -388,19 +397,33 @@ class PiFrameGrabber(multiprocessing.Process):
                         self._stop_queue.task_done()
                         logging.warning("Stop Task Done")
                         break
-                    raw_capture.truncate(0)
+                    if self._video_prefix != None:
+                        if time.time() - start_time >= self._VIDEO_CHUNCK_DURATION:
+                            i += 1
+                            capture.split_recording(self._make_video_name(i))
+                            start_time = time.time()
                     # out = np.copy(frame.array)
-                    out = cv2.cvtColor(frame.array,cv2.COLOR_BGR2GRAY)
+                    out = cv2.cvtColor(raw_capture.array,cv2.COLOR_BGR2GRAY)
+                    raw_capture.truncate(0)
                     #fixme here we could actually pass a JPG compressed file object (http://docs.scipy.org/doc/scipy-0.16.0/reference/generated/scipy.misc.imsave.html)
                     # This way, we would manage to get faster FPS
                     self._queue.put(out)
                     self._analog_gain.value = float(capture.analog_gain)
+
+                if self._video_prefix != None:
+                    capture.wait_recording(1)
+                    capture.stop_recording()
+
         finally:
             logging.warning("Closing frame grabber process")
             self._stop_queue.close()
             self._queue.close()
             logging.warning("Camera Frame grabber stopped acquisition cleanly")
 
+    def _make_video_name(self, i):
+        w,h = self._target_resolution
+        video_info= "%ix%i@%i" %(w, h, self._target_fps)
+        return '%s_%s_%05d.h264' % (self._video_prefix, video_info, i)
 
 class OurPiCameraAsync(BaseCamera):
     _description = {"overview": "Default class to acquire frames from the raspberry pi camera asynchronously.",
