@@ -432,6 +432,7 @@ class ControlThread(Thread):
 
 
         logging.info("Initialising monitor")
+        roiBuilderStart = cam.start_time # So that I can figure out how much of the saved video is from roi_builder
         cam.restart()
         # the camera start time is the reference 0
 
@@ -449,6 +450,7 @@ class ControlThread(Thread):
             "machine_id": self._info["id"],
             "machine_name": self._info["name"],
             "date_time": cam.start_time,  # the camera start time is the reference 0
+            "roi_build_time": cam.start_time-roiBuilderStart,
             "frame_width": cam.width,
             "frame_height": cam.height,
             "version": self._info["version"]["id"],
