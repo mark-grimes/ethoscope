@@ -333,7 +333,7 @@ class V4L2Camera(BaseCamera):
 
 class PiFrameGrabber(multiprocessing.Process):
 
-    def __init__(self, target_fps, target_resolution, queue, stop_queue, *args, **kwargs):
+    def __init__(self, target_fps, target_resolution, save_location, queue, stop_queue, *args, **kwargs):
         """
         Class to grab frames from pi camera. Designed to be used within :class:`~ethoscope.hardware.camreras.camreras.OurPiCameraAsync`
         This allows to get frames asynchronously as acquisition is a bottleneck.
@@ -342,6 +342,8 @@ class PiFrameGrabber(multiprocessing.Process):
         :type target_fps: int
         :param target_resolution: the desired resolution (w, h)
         :type target_resolution: (int, int)
+        :param save_location: a filename to save the video to, or None to disable saving
+        :type save_location: string
         :param queue: a queue that stores frame and makes them available to the parent process
         :type queue: :class:`~multiprocessing.Queue`
         :param stop_queue: a queue that can stop the async acquisition
@@ -355,7 +357,7 @@ class PiFrameGrabber(multiprocessing.Process):
         self._target_fps = target_fps
         self._target_resolution = target_resolution
         self._analog_gain = multiprocessing.Value("f", -1.0)
-        self._video_prefix = None
+        self._video_prefix = save_location
         self._bitrate = 200000
         self._VIDEO_CHUNCK_DURATION = 5*60 # Split video into 5 minute chunks
         super(PiFrameGrabber, self).__init__()
@@ -382,6 +384,7 @@ class PiFrameGrabber(multiprocessing.Process):
 
                 capture.framerate = self._target_fps
                 raw_capture = PiRGBArray(capture, size=self._target_resolution)
+                logging.warning("Saving video to "+str(self._video_prefix))
 
                 if self._video_prefix != None:
                     i = 0
@@ -431,7 +434,7 @@ class OurPiCameraAsync(BaseCamera):
                                    
 
     _frame_grabber_class = PiFrameGrabber
-    def __init__(self, target_fps=20, target_resolution=(1280, 960), *args, **kwargs):
+    def __init__(self, target_fps=20, target_resolution=(1280, 960), save_location=None, *args, **kwargs):
         """
         Class to acquire frames from the raspberry pi camera asynchronously.
         At the moment, frames are only greyscale images.
@@ -440,6 +443,7 @@ class OurPiCameraAsync(BaseCamera):
         :type target_fps: int
         :param target_fps: the desired resolution (W x H)
         :param target_resolution: (int,int)
+        :param save_location: a filename to save the video to, or None to disable saving video
         :param args: additional arguments
         :param kwargs: additional keyword arguments
         """
@@ -452,7 +456,7 @@ class OurPiCameraAsync(BaseCamera):
         self._kwargs = kwargs
         self._queue = multiprocessing.Queue(maxsize=1)
         self._stop_queue = multiprocessing.JoinableQueue(maxsize=1)
-        self._p = self._frame_grabber_class(target_fps,target_resolution,self._queue,self._stop_queue, *args, **kwargs)
+        self._p = self._frame_grabber_class(target_fps,target_resolution,save_location,self._queue,self._stop_queue, *args, **kwargs)
         self._p.daemon = True
         self._p.start()
         try:
@@ -541,7 +545,7 @@ class OurPiCameraAsync(BaseCamera):
 
 
 class DummyFrameGrabber(multiprocessing.Process):
-    def __init__(self, target_fps, target_resolution, queue, stop_queue, path, *args, **kwargs):
+    def __init__(self, target_fps, target_resolution, save_location, queue, stop_queue, path, *args, **kwargs):
         """
         Class to mimic the behaviour of :class:`~ethoscope.hardware.input.cameras.PiFrameGrabber`.
         This is intended for testing purposes.
@@ -551,6 +555,7 @@ class DummyFrameGrabber(multiprocessing.Process):
         :type target_fps: int
         :param target_fps: the desired resolution (W x H)
         :param target_resolution: (int,int)
+        :param save_location: ignored since no video is ever saved
         :param args: additional arguments
         :param kwargs: additional keyword arguments
         """

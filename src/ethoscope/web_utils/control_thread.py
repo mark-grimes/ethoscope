@@ -1,5 +1,6 @@
 import tempfile
 import os
+import datetime
 import traceback
 import shutil
 import logging
@@ -159,6 +160,8 @@ class ControlThread(Thread):
         except OSError:
             pass
 
+        self._ethoscope_dir = ethoscope_dir
+
         self._tmp_dir = tempfile.mkdtemp(prefix="ethoscope_")
         #todo add 'data' -> how monitor was started to metadata
         self._info = {  "status": "stopped",
@@ -260,6 +263,40 @@ class ControlThread(Thread):
             self._option_dict[key]["class"] = Class
             self._option_dict[key]["kwargs"] = kwargs
 
+        # For whether the video should be recorded, we don't want to blindly allow the caller
+        # to set the location in case they overwrite important files. We'll hard code a check
+        # for a "record_video" boolean and work out the path ourselves.
+        try:
+            self._option_dict["camera"]["kwargs"]["save_location"] = None # Make sure the user hasn't tried to force a location
+            if data["camera"]["arguments"]["record_video"]:
+                self._option_dict["camera"]["kwargs"]["save_location"] = self._video_save_location()
+        except KeyError:
+            pass
+
+    def _video_save_location(self):
+        date_time = datetime.datetime.fromtimestamp(self._info["time"])
+        formated_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
+
+        try:
+            code = self._info["experimental_info"]["code"]
+        except KeyError:
+            code = "NA"
+            logging.warning("No code field in experimental info")
+
+        file_prefix = "%s_%s_%s" % (formated_time, self._info["id"], code)
+
+        output_video_full_prefix = os.path.join(self._ethoscope_dir,
+                                                self._info["id"],
+                                                self._info["name"],
+                                                formated_time,
+                                                file_prefix)
+
+        try:
+            os.makedirs(os.path.dirname(output_video_full_prefix))
+        except OSError:
+            pass
+
+        return output_video_full_prefix
 
 
     def _update_info(self):
