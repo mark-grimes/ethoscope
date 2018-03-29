@@ -195,6 +195,10 @@ class MovieVirtualCamera(BaseCamera):
     def start_time(self):
         return self._start_time
 
+    @start_time.setter
+    def start_time(self, value):
+        self._start_time = value
+
     @property
     def path(self):
         return self._path
@@ -214,7 +218,7 @@ class MovieVirtualCamera(BaseCamera):
         if self._use_wall_clock:
             now = time.time()
             return now - self._start_time
-        time_s = self.capture.get(CAP_PROP_POS_MSEC) / 1e3
+        time_s = self._start_time + self.capture.get(CAP_PROP_POS_MSEC) / 1e3
         return time_s
 
     def is_last_frame(self):
