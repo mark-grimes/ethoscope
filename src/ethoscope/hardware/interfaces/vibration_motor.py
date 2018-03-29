@@ -1,6 +1,11 @@
 import logging
 import time
-import RPi.GPIO
+try:
+    import RPi.GPIO
+except ImportError:
+    # Assume we're running in a non-RPi environment (probably offline tracking) and
+    # ignore. The class probably won't be used.
+    logging.warning("Unable to import RPi.GPIO VibrationMotor will not work")
 from ethoscope.hardware.interfaces.interfaces import BaseInterface
 
 

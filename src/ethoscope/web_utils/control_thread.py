@@ -19,7 +19,10 @@ from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
 from ethoscope.hardware.input.HIH6130 import BufferedHIH6130
-from ethoscope.hardware.input.TSL2591 import TSL2591
+try:
+    from ethoscope.hardware.input.TSL2591 import TSL2591
+except ImportError:
+    logging.warning("Couldn't import TSL2591, it won't be available for use")
 from ethoscope.stimulators.stimulators import DefaultStimulator
 #<<<<<<< HEAD
 #from ethoscope.stimulators.sleep_depriver_stimulators import , SleepDepStimulator, SleepDepStimulatorCR, ExperimentalSleepDepStimulator, MiddleCrossingStimulator#, SystematicSleepDepInteractor
